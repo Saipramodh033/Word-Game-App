@@ -1,5 +1,5 @@
 let selectedWordObj;
-let maxAttempts = 5;
+let maxAttempts = 8;
 let attemptsLeftPlayer1;
 let attemptsLeftPlayer2;
 let scorePlayer1 = 0;
@@ -25,6 +25,9 @@ function setDifficulty(difficulty) {
 
 // Function to Initialize Game
 async function initializeGame() {
+    scorePlayer1 = 0;
+scorePlayer2 = 0;
+
     const difficulty = localStorage.getItem('difficulty') || 'easy';
     setDifficultySettings(difficulty);
 
@@ -60,27 +63,42 @@ function setDifficultySettings(difficulty) {
 
 // Fetch Word and Hint from API
 async function fetchWord() {
-    try {
-        // Fetch a random word from the Free Dictionary API
-        const randomWordResponse = await fetch('https://random-word-api.herokuapp.com/word?number=1');
-        if (!randomWordResponse.ok) throw new Error('Failed to fetch word');
-        const randomWordData = await randomWordResponse.json();
-        const randomWord = randomWordData[0];
+    let wordFound = false;
+    let word = '';
+    let hint = '';
 
-        // Fetch the definition of the random word from the Free Dictionary API
-        const definitionResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${randomWord}`);
-        if (!definitionResponse.ok) throw new Error('Failed to fetch definition');
-        const definitionData = await definitionResponse.json();
-        const definition = definitionData[0]?.meanings[0]?.definitions[0]?.definition || 'No definition available.';
+    while (!wordFound) {
+        try {
+            // Fetch a random word from the Random Word API
+            const randomWordResponse = await fetch('https://random-word-api.herokuapp.com/word?number=1');
+            if (!randomWordResponse.ok) throw new Error('Failed to fetch word');
+            const randomWordData = await randomWordResponse.json();
+            word = randomWordData[0].toUpperCase();
 
-        return {
-            word: randomWord.toUpperCase(),
-            hint: revealhint ? definition : 'No hint available.'
-        };
-    } catch (error) {
-        console.error('Error fetching word or hint:', error);
-        return { word: 'DEFAULT', hint: 'No hint available.' };
+            // Fetch the definition of the random word from the Dictionary API
+            const definitionResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+            if (!definitionResponse.ok) throw new Error('Failed to fetch definition');
+            const definitionData = await definitionResponse.json();
+
+            // Check if the structure contains a valid definition
+            hint = definitionData[0]?.meanings?.[0]?.definitions?.[0]?.definition || null;
+
+            // If hint is available, break the loop
+            if (hint) {
+                wordFound = true;
+            } else {
+                console.log(`No definition found for word "${word}". Fetching a new word...`);
+            }
+        } catch (error) {
+            console.error('Error fetching word or hint:', error);
+        }
     }
+
+    // Return the word and hint (or a message if no hint is available)
+    return {
+        word,
+        hint: revealhint ? hint : 'No hint available.'
+    };
 }
 
 // Generate Letter Boxes
@@ -137,6 +155,7 @@ function handleInput(e) {
         decreaseAttempts();
     }
 
+    // Move to the next input field regardless of whether the input is correct or wrong
     moveToNextInput(index);
 }
 
@@ -150,6 +169,7 @@ function moveToNextInput(currentIndex) {
         }
     }
 }
+
 
 // Update Player Stats
 function updatePlayerStats() {
@@ -188,10 +208,10 @@ function switchPlayer() {
 // Update Score for Correct Guess
 function updateScore() {
     if (currentPlayer === 1) {
-        scorePlayer1++;
+        scorePlayer1+=10;
         document.getElementById('player1-score').innerText = scorePlayer1;
     } else {
-        scorePlayer2++;
+        scorePlayer2+=10;
         document.getElementById('player2-score').innerText = scorePlayer2;
     }
 }
@@ -235,6 +255,7 @@ function showHint() {
 function resetGame() {
     clearInterval(timer); // Stop any existing timer
     initializeGame();
+
 }
 
 // Start Timer
